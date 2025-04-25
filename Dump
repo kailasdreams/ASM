@@ -1,0 +1,129 @@
+from flask import Flask, render_template
+import requests
+from requests.auth import HTTPBasicAuth
+import urllib3
+import os
+import csv
+
+app = Flask(__name__)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# Load device info from CSV file in the same directory as this script
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+csv_file_path = os.path.join(BASE_DIR, 'f5_devices.csv')
+
+F5_DEVICES = []
+
+try:
+    with open(csv_file_path, mode='r', newline='', encoding='utf-8') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            F5_DEVICES.append({
+                "ip": row["ip"].strip(),
+                "hostname": row["hostname"].strip(),
+                "username": row["username"].strip(),
+                "password": row["password"].strip()
+            })
+except FileNotFoundError:
+    print(f"❌ CSV file not found at: {csv_file_path}")
+
+
+def fetch_json(url, auth):
+    try:
+        response = requests.get(url, auth=auth, verify=False)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching {url}: {e}")
+        return None
+
+
+@app.route('/')
+def index():
+    devices_summary = []
+
+    for device in F5_DEVICES:
+        base_url = f"https://{device['ip']}"
+        auth = HTTPBasicAuth(device['username'], device['password'])
+
+        policies_url = f"{base_url}/mgmt/tm/asm/policies?$expandSubcollections=true"
+        data = fetch_json(policies_url, auth)
+
+        total = blocking = transparent = 0
+        if data and "items" in data:
+            for policy in data["items"]:
+                total += 1
+                mode = policy.get("enforcementMode")
+                if mode == "blocking":
+                    blocking += 1
+                elif mode == "transparent":
+                    transparent += 1
+
+        devices_summary.append({
+            "ip": device["ip"],
+            "hostname": device["hostname"],
+            "total": total,
+            "blocking": blocking,
+            "transparent": transparent
+        })
+
+    return render_template("index.html", devices=devices_summary)
+
+
+@app.route('/policy_details/<ip>')
+def policy_details(ip):
+    device = next((d for d in F5_DEVICES if d["ip"] == ip), None)
+    if not device:
+        return "Device not found", 404
+
+    base_url = f"https://{device['ip']}"
+    auth = HTTPBasicAuth(device['username'], device['password'])
+
+    policies_url = f"{base_url}/mgmt/tm/asm/policies?$expandSubcollections=true"
+    data = fetch_json(policies_url, auth)
+
+    policy_list = []
+
+    if data and "items" in data:
+        for policy in data["items"]:
+            name = policy.get("name", "N/A")
+            mode = policy.get("enforcementMode", "N/A")
+            policy_id = policy.get("id")
+            vips = []
+
+            if policy_id:
+                detail_url = f"{base_url}/mgmt/tm/asm/policies/{policy_id}?expandSubcollections=true"
+                detail_data = fetch_json(detail_url, auth)
+
+                if detail_data:
+                    for vip_ref in detail_data.get("virtualServers", []) + detail_data.get("manualVirtualServers", []):
+                        vip_path = vip_ref.replace('/', '~')
+                        vip_url = f"{base_url}/mgmt/tm/ltm/virtual/{vip_path}"
+                        vip_data = fetch_json(vip_url, auth)
+
+                        if vip_data:
+                            vips.append({
+                                "name": vip_data.get("name", "N/A"),
+                                "partition": vip_data.get("partition", "N/A"),
+                                "address": vip_data.get("destination", "N/A"),
+                                "ip": device["ip"]
+                            })
+                        else:
+                            partition = vip_ref.split('/')[1] if '/' in vip_ref else 'N/A'
+                            name = vip_ref.split('/')[-1]
+                            vips.append({
+                                "name": name,
+                                "partition": partition,
+                                "address": "N/A",
+                                "ip": device["ip"]
+                            })
+
+            policy_list.append({
+                "device_ip": device["ip"],
+                "device_name": device["hostname"],
+                "name": name,
+                "mode": mode,
+                "vips": vips if vips else [{"name": "N/A", "partition": "N/A", "address": "N/A", "ip": device["ip"]}]
+            })
+
+    return render_template("policy_details.html", policies=policy_list)
