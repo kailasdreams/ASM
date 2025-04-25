@@ -2,55 +2,59 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>F5 ASM Summary</title>
+  <title>Policy Details</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    .text-blocking {
+    .text-mode-blocking {
       color: red;
       font-weight: bold;
     }
-    .text-transparent {
+    .text-mode-transparent {
       color: orange;
       font-weight: bold;
     }
-    .text-total {
-      color: blue;
-      font-weight: bold;
-    }
-    td a {
-      color: #0d6efd;
-      text-decoration: none;
-    }
-    td a:hover {
-      text-decoration: underline;
+    .table th, .table td {
+      vertical-align: middle;
+      text-align: center;
     }
   </style>
 </head>
 <body class="bg-light">
-<div class="container mt-5">
-  <h2 class="mb-4 text-primary text-center">🔐 F5 ASM Device Summary</h2>
-  <table class="table table-bordered table-hover text-center">
-    <thead class="table-dark">
-      <tr>
-        <th>F5 IP</th>
-        <th>Hostname</th>
-        <th>Total Policies</th>
-        <th>Blocking</th>
-        <th>Transparent</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for device in devices %}
+  <div class="container mt-5">
+    <h2 class="mb-4 text-center text-primary">📋 F5 ASM Policy Details</h2>
+    <table class="table table-bordered table-hover">
+      <thead class="table-dark">
         <tr>
-          <td><a href="{{ url_for('policy_details', ip=device.ip) }}">{{ device.ip }}</a></td>
-          <td>{{ device.hostname }}</td>
-          <td class="text-total">{{ device.total }}</td>
-          <td class="text-blocking">{{ device.blocking }}</td>
-          <td class="text-transparent">{{ device.transparent }}</td>
+          <th>Device Name</th>
+          <th>Device IP</th>
+          <th>Policy Name</th>
+          <th>Enforcement Mode</th>
+          <th>VIP Name</th>
+          <th>VIP Partition</th>
+          <th>VIP Address</th>
         </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
+      </thead>
+      <tbody>
+        {% for policy in policies %}
+          {% for vip in policy.vips %}
+            <tr>
+              <td>{{ policy.device_name }}</td>
+              <td>{{ policy.device_ip }}</td>
+              <td>{{ policy.name }}</td>
+              <td class="{% if policy.mode == 'blocking' %}text-mode-blocking{% elif policy.mode == 'transparent' %}text-mode-transparent{% endif %}">
+                {{ policy.mode }}
+              </td>
+              <td>{{ vip.name }}</td>
+              <td>{{ vip.partition }}</td>
+              <td>{{ vip.address }}</td>
+            </tr>
+          {% endfor %}
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="text-center">
+      <a href="{{ url_for('index') }}" class="btn btn-secondary mt-3">⬅️ Back to Summary</a>
+    </div>
+  </div>
 </body>
 </html>
