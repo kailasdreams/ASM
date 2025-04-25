@@ -144,4 +144,3 @@ output = si.getvalue()
 return Response(output, mimetype="text/csv", headers={"Content-Disposition": f"attachment;filename={device['hostname']}_policies.csv"})
 
 if name == 'main': app.run(debug=True)
-
