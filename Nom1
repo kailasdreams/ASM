@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Policy Details</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body class="bg-light p-4">
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="text-primary">Policy Details</h2>
+        <a href="{{ url_for('download_csv', ip=policies[0].device_ip) }}" class="btn btn-success">⬇ Download CSV</a>
+    </div>
+    <table class="table table-bordered table-hover text-center">
+        <thead class="table-dark">
+        <tr>
+            <th>Device Name</th>
+            <th>Device IP</th>
+            <th>Policy Name</th>
+            <th>Enforcement Mode</th>
+            <th>VIP Name</th>
+            <th>VIP Partition</th>
+            <th>VIP Address</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for policy in policies %}
+            {% for vip in policy.vips %}
+                <tr>
+                    <td>{{ policy.device_name }}</td>
+                    <td>{{ policy.device_ip }}</td>
+                    <td>{{ policy.name }}</td>
+                    <td>
+                        {% if policy.mode == 'blocking' %}
+                            <span class="text-danger fw-bold">Blocking</span>
+                        {% elif policy.mode == 'transparent' %}
+                            <span class="text-warning fw-bold">Transparent</span>
+                        {% else %}
+                            {{ policy.mode }}
+                        {% endif %}
+                    </td>
+                    <td>{{ vip.name }}</td>
+                    <td>{{ vip.partition }}</td>
+                    <td>{{ vip.address }}</td>
+                </tr>
+            {% endfor %}
+        {% endfor %}
+        </tbody>
+    </table>
+    <a href="/" class="btn btn-secondary mt-3">⬅ Back to Summary</a>
+</div>
+</body>
+</html>
